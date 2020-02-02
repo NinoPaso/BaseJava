@@ -2,8 +2,7 @@ package cn.basejava.hashMap;
 /*
    手工实现map-01
  */
-
-public class HashMap01 {
+public class HashMap01<K,V> {
     Node2[] table;//位桶数组
     int size;//存放的键值对个数
 
@@ -13,7 +12,7 @@ public class HashMap01 {
     }
 
     //put方法实现
-    public void put(Object key,Object value){
+    public void put(K key,V value){
         Node2 node2 = new Node2();
         node2.hash = myHash(key.hashCode(),table.length);
         node2.key = key;
@@ -27,6 +26,7 @@ public class HashMap01 {
         boolean keyRepeat = false;
         if(temp == null){
             table[node2.hash] = node2;
+            size++;
         }else{
             //如果数组下标对应节点不为空：遍历该下标内所有节点进行比较，
             // 如果key相等，进行value覆盖，否则追加到最后一个的next
@@ -42,6 +42,7 @@ public class HashMap01 {
             }
             if(!keyRepeat){
                 iterLast.next = node2;
+                size++;
             }
         }
     }
@@ -65,14 +66,32 @@ public class HashMap01 {
         sb.setCharAt(sb.length()-1,'}');
         return sb.toString();
     }
+    //实现get方法(1.获取key的hash值2.进行比较遍历)
+    public Object get(K key){
+        int hash = myHash(key.hashCode(),table.length);
+        V value = null;//定义返回值
+        if(table[hash] != null){
+            Node2 temp = table[hash];
+            while(temp!=null){
+                if(key.equals(temp.key)){
+                    value = (V)temp.value;
+                    break;
+                }else{
+                    temp = temp.next;
+                }
+            }
+        }
+        return value;
+    }
 
     //主方法进行测试
     public static void main(String[] args){
-        HashMap01 map = new HashMap01();
+        HashMap01<Integer,String> map = new HashMap01<>();
         map.put(10,"a");
         map.put(20,"b");
         map.put(30,"c");
         map.put(40,"d");
         System.out.println(map.toString());
+        System.out.println(map.get(10));
     }
 }

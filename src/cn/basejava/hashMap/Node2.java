@@ -4,10 +4,10 @@ package cn.basejava.hashMap;
 /*
     节点对象
  */
-public class Node2 {
+public class Node2<K,V> {
     int hash;//哈希值
-    Object key;
-    Object value;
+    K key;
+    V value;
     Node2 next;
 
 }
