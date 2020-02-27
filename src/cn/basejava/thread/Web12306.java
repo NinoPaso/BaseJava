@@ -12,6 +12,9 @@ public class Web12306 implements Runnable{
 
     @Override
     public void run() {
+        test();
+    }
+    public synchronized void test(){
         while(ticketNum>0){
             try {
                 Thread.sleep(200);//并发数据问题
