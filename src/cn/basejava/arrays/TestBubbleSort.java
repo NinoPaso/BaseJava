@@ -8,7 +8,7 @@ public class TestBubbleSort {
         System.out.println(Arrays.toString(TestBubbleSort.bubbleSort(a)));
     }
 
-    public static int[] bubbleSort(int[] array){
+    private static int[] bubbleSort(int[] array){
         //设置交换中间参数
         int temp;
         for(int i = 0; i<array.length;i++){
