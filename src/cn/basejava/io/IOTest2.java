@@ -9,7 +9,7 @@ public class IOTest2 {
      */
     public static void main(String[] args) {
         //此处文件相对路径和项目目录同级，否则使用绝对路径
-        File dest = new File("testOut.txt");
+        File dest = new File("testOut.");
         OutputStream os = null;
         try {
             os = new FileOutputStream(dest);

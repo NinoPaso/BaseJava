@@ -7,8 +7,32 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
+/**
+ *  添加策略模式 + 实现线程的拒绝策略
+ */
 public class TestPool {
+	public static void main(String[] args) {
+		ThreadPool pool = new ThreadPool(1, 1000, TimeUnit.MILLISECONDS, 1, (queue, task)->{
 
+		queue.put(task);});
+		for (int i = 0; i < 3; i++) {
+			final int j = i;
+			pool.execute(()->{
+				try {
+					Thread.sleep(100000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				System.out.println("执行任务"+j);
+			});
+		}
+	}
+}
+
+// 定义拒绝策略的接口
+@FunctionalInterface
+interface RejectPolicy<T> {
+	void reject(BlockingQueue<T> queue, T task);
 }
 
 // 定义线程池
@@ -23,14 +47,17 @@ class ThreadPool {
 	private long timeout;
 	// 5.定义线程的获取时间的单位
 	private TimeUnit unit;
+	// 6.策略模式
+	private RejectPolicy<Runnable> rejectPolicy;
 	
 	// 构造方法进行线程池定义
-	public ThreadPool(int coreSize, long timeout, TimeUnit unit, int queueCapcity) {
+	public ThreadPool(int coreSize, long timeout, TimeUnit unit, int queueCapcity, RejectPolicy<Runnable> rejectPolicy) {
 		super();
 		this.coreSize = coreSize;
 		this.timeout = timeout;
 		this.unit = unit;
 		this.queue = new BlockingQueue<>(queueCapcity);
+		this.rejectPolicy = rejectPolicy;
 	}
 	
 	// 定义线程池开启任务执行的方法
@@ -40,10 +67,18 @@ class ThreadPool {
 		synchronized (works) {
 			if (works.size() < coreSize) {
 				Worker work = new Worker(task);
+				System.out.println("创建了worker..."+work+"任务"+task);
 				works.add(work);
 				work.start();
 			} else {
-				queue.put(task);
+//				queue.put(task);
+				// 1. 死等
+				// 2. 带超时时间的等待
+				// 3. 调用者放弃任务的执行
+				// 4. 如果队列满   调用者抛出异常
+				// 5. 让调用者自己进行任务执行
+				// 调用策略模式接口决定阻塞后的选择
+				queue.tryPut(rejectPolicy, task);
 			}
 		}
 	}
@@ -58,8 +93,10 @@ class ThreadPool {
 		@Override
 		public void run() {
 			// 进行任务判断  首先执行当前的任务  再去阻塞队列中进行获取执行
-			while (null != task || (task = queue.take()) != null) {
+//			while (null != task || (task = queue.take()) != null) {
+			while (null != task || (task = queue.poll(timeout, unit)) != null) {
 				try {
+					System.out.println("正在执行..." + task);
 					task.run();
 				} catch (Exception e) {
 					System.out.println(e.getMessage());
@@ -70,6 +107,7 @@ class ThreadPool {
 			}
 			
 			synchronized (works) {
+				System.out.println("移除了worker"+this);
 				works.remove(this);
 			}
 		}
@@ -153,12 +191,14 @@ class BlockingQueue<T> {
 		try {
 			while (deque.size() == capcity) {
 				try {
+					System.out.println("陷入等待阻塞中..."+t);
 					fullWaitSet.await();
 				} catch (Exception e) {
 					// TODO: handle exception
 					System.out.println(e.getMessage());
 				}
 			}
+			System.out.println("加入了任务队列..."+t);
 			deque.addFirst(t);
 			// 唤醒获取任务线程
 			emptyWaitSet.signal();
@@ -167,7 +207,31 @@ class BlockingQueue<T> {
 			// TODO: handle finally clause
 		}
 	}
-	
+	// 定义带超时时间的 阻塞添添加任务
+	public boolean offer(T t, long timeout, TimeUnit unit) {
+		// 锁对象
+		lock.lock();
+		try {
+			// 进行时间统一转换
+			long nanos = unit.toNanos(timeout);
+			while (deque.size() == capcity) {
+				try {
+					if (nanos <= 0) {
+						return false;
+					}
+					nanos = fullWaitSet.awaitNanos(nanos);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+			deque.addFirst(t);
+			// 唤醒获取任务线程
+			emptyWaitSet.signal();
+			return true;
+		} finally {
+			lock.unlock();
+		}
+	}
 	// 定义返回队列的大小
 	public int size() {
 		lock.lock();
@@ -175,6 +239,24 @@ class BlockingQueue<T> {
 			return deque.size();
 		} finally {
 			// TODO: handle exception
+			lock.unlock();
+		}
+	}
+
+	// 实现拒绝策略的tryPut
+	public void tryPut(RejectPolicy<T> rejectPolicy, T t) {
+		lock.lock();
+		try {
+			if (deque.size() == capcity) {
+
+				rejectPolicy.reject(this, t);
+			} else {
+				System.out.println("加入了任务队列..." + t);
+				deque.addFirst(t);
+				// 添加任务后  唤醒获取任务线程
+				emptyWaitSet.signal();
+			}
+		} finally {
 			lock.unlock();
 		}
 	}
